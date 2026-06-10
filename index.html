@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPPO — Beyond Uniform Token-Level Trust Region in LLM Reinforcement Learning</title>
+    <meta name="description" content="CPPO (Cumulative Prefix-divergence Policy Optimization) replaces uniform token-level trust regions with a position-weighted threshold and a cumulative prefix budget, aligning RLVR updates with the autoregressive structure of LLMs for more stable training and higher reasoning accuracy.">
+
+    <!-- Fonts: Fraunces (display) · Spectral (body) · IBM Plex Mono (technical) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true},{left: '$', right: '$', display: false}]});"></script>
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<!-- ==================== MASTHEAD ==================== -->
+<header class="masthead">
+    <div class="wrap">
+        <div class="masthead-top anim d1">
+            <span>Tencent&nbsp;Hunyuan</span>
+            <span class="rule"></span>
+            <span>RLVR · Trust Region</span>
+            <span class="rule"></span>
+            <span>arXiv 2606.10968</span>
+        </div>
+
+        <h1 class="wordmark anim d2">CPPO<span class="dot">.</span></h1>
+        <p class="lede anim d3">Beyond Uniform Token-Level Trust Region in LLM Reinforcement Learning</p>
+
+        <div class="byline anim d4">
+            <div class="author-row">
+                <span class="author">Renjie Mao<sup>*</sup></span>
+                <span class="author">Xiangxin Zhou<sup>*&dagger;</sup></span>
+                <span class="author">Lvfang Tao<sup>*&dagger;</sup></span>
+                <span class="author">Yixin Ding</span>
+                <span class="author">Yu Shi</span>
+            </div>
+            <div class="author-row">
+                <span class="author">Yongguang Lin</span>
+                <span class="author">Yuheng Wu</span>
+                <span class="author">Honglin Zhu</span>
+                <span class="author">Qian Qiu</span>
+                <span class="author">Wenxi Zhu<sup>&dagger;</sup></span>
+            </div>
+            <p class="affil">Tencent Hunyuan</p>
+            <p class="notes"><sup>*</sup> Equal contribution &nbsp;·&nbsp; <sup>&dagger;</sup> Corresponding author</p>
+        </div>
+
+        <nav class="actions anim d5">
+            <a href="cppo.pdf" class="act primary" target="_blank" rel="noopener">&#9633;&nbsp; Paper</a>
+            <a href="https://arxiv.org/abs/2606.10968" class="act ghost" target="_blank" rel="noopener">&#8599;&nbsp; arXiv</a>
+            <span class="act dim" aria-disabled="true" title="Code release coming soon">&lt;/&gt;&nbsp; Code <span class="soon">soon</span></span>
+        </nav>
+
+        <!-- Signature motif: the position-weight schedule w_t, decaying early→late -->
+        <div class="tokenstrip anim d6" aria-hidden="true">
+            <div class="tokenstrip-cells" id="tokenstrip"></div>
+            <div class="tokenstrip-legend">
+                <span>token <b>t = 1</b> · tight trust region</span>
+                <span>position weight w<sub>t</sub> &#8600;</span>
+                <span><b>t = T</b> · relaxed</span>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- ==================== TL;DR ==================== -->
+<section id="tldr" class="section">
+    <div class="wrap">
+        <div class="sec-head reveal">
+            <span class="sec-idx">§01</span>
+            <h2 class="sec-title">TL;DR</h2>
+            <span class="sec-aside">In one screen</span>
+        </div>
+        <div class="tldr">
+            <p class="tldr-lead reveal">
+                PPO/GRPO-style trust regions treat every token the same. But in autoregressive generation, <strong>early tokens matter more</strong> and <strong>drift accumulates along the prefix</strong>. CPPO reallocates the divergence budget accordingly — a drop-in token mask, no new loss term.
+            </p>
+            <ul class="tldr-points reveal">
+                <li><strong>Problem.</strong> A uniform threshold $D_t \le \delta$ is loose on high-impact early tokens and over-tight on late ones, with no memory of how far the prefix has already drifted.</li>
+                <li><strong>Fix.</strong> A position weight $w_t$ tightens early positions; a cumulative prefix budget $\delta_b$ caps the weighted prefix average. Together they give a provably tighter improvement bound.</li>
+                <li><strong>Result.</strong> Best AIME24/25/26 Avg@16 on all four Qwen3 settings; <strong>+5.56</strong> over the best baseline on 30B-A3B-Base, and stable where others collapse.</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- ==================== RESULTS (front and center) ==================== -->
+<section id="results" class="section tinted">
+    <div class="wrap">
+        <div class="sec-head reveal">
+            <span class="sec-idx">§02</span>
+            <h2 class="sec-title">Results</h2>
+            <span class="sec-aside">4× Qwen3</span>
+        </div>
+
+        <div class="reveal">
+            <div class="tabs" role="tablist">
+                <button class="tab active" data-tab="t-main">Main Results</button>
+                <button class="tab" data-tab="t-curves">Validation Curves</button>
+                <button class="tab" data-tab="t-abl">Ablations</button>
+            </div>
+
+            <!-- Main -->
+            <div class="panel-tab active" id="t-main">
+                <div class="table-scroll">
+                    <table class="data">
+                        <thead>
+                            <tr><th>Method</th><th>Qwen3-1.7B</th><th>1.7B-Base</th><th>8B-Base</th><th>30B-A3B-Base</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>GRPO</td><td>27.91</td><td>8.89</td><td>23.96</td><td>38.19</td></tr>
+                            <tr><td>MinPRO</td><td>27.71</td><td>11.04</td><td><span class="under">29.72</span></td><td>48.12</td></tr>
+                            <tr><td>CISPO</td><td><span class="under">28.82</span></td><td><span class="under">11.87</span></td><td>29.58</td><td><span class="collapse">collapse</span></td></tr>
+                            <tr><td>DPPO</td><td>28.19</td><td>10.90</td><td>28.89</td><td><span class="under">49.23</span></td></tr>
+                            <tr><td>TRM-Max</td><td>25.21</td><td>9.72</td><td>26.73</td><td>20.27</td></tr>
+                            <tr><td>TRM-Avg</td><td>26.87</td><td>11.70</td><td>27.98</td><td>48.96</td></tr>
+                            <tr class="ours"><td>CPPO (ours)</td><td>31.88</td><td>12.78</td><td>31.11</td><td>54.79</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="tab-desc" style="margin-top:1rem;margin-bottom:0;">Best validation AIME24/25/26 Avg@16 (%) within the matched window $[0,T^{\text{stop}}]$. All divergence masks share the same Top-K reduced-TV score and per-model threshold scale, so the comparison isolates the trust-region rule. <strong>Bold</strong> = best, <span class="under">underline</span> = second.</p>
+                <div class="bignum">
+                    <span class="n">+5.56</span>
+                    <span class="t">over the best baseline on 30B-A3B-Base — the longest-horizon (16k) setting, where remaining-horizon amplification is strongest. Over the matched DPPO baseline: <strong>+3.69 / +1.88 / +2.22 / +5.56</strong> across the four models.</span>
+                </div>
+            </div>
+
+            <!-- Curves -->
+            <div class="panel-tab" id="t-curves">
+                <figure class="plate result-fig">
+                    <img src="assets/figs/fig4_validation_curves.png" alt="Validation AIME24/25/26 Avg@16 curves for the three Base-model runs.">
+                    <figcaption class="figcap"><span class="lab">Figure 2 —</span> Validation curves on Qwen3-1.7B-Base, 8B-Base and 30B-A3B-Base. CPPO holds a consistent lead; its separation from DPPO <b>widens over training</b> as the prefix constraint engages. CISPO collapses and TRM-Max degrades to 20.27, while CPPO stays stable.</figcaption>
+                </figure>
+            </div>
+
+            <!-- Ablations -->
+            <div class="panel-tab" id="t-abl">
+                <figure class="plate result-fig">
+                    <img src="assets/figs/fig5_ablations.png" alt="Ablations on Qwen3-1.7B: single-mechanism, position-weight ordering, hard mask vs soft gate.">
+                    <figcaption class="figcap"><span class="lab">Figure 3 —</span> Qwen3-1.7B. Each mechanism beats DPPO alone and the full mask is best (left); the ordered schedule beats shuffled weights (middle); the soft-gate variant tracks the hard mask (right).</figcaption>
+                </figure>
+                <figure class="plate result-fig">
+                    <img src="assets/figs/fig6_base_ablations.png" alt="Qwen3-1.7B-Base ablations: hyperparameter sensitivity, KL vs TV, Binary vs Top-K.">
+                    <figcaption class="figcap"><span class="lab">Figure 4 —</span> Qwen3-1.7B-Base. Robust to $(\delta_b, w_{\min})$ (left) and to the divergence choice — KL matches TV, Binary matches Top-K (middle, right). The gain comes from enforcing thresholds as a <b>prefix budget</b>, not from the estimator.</figcaption>
+                </figure>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ==================== WHY IT FAILS (formula-led, trimmed) ==================== -->
+<section id="motivation" class="section">
+    <div class="wrap narrow">
+        <div class="sec-head reveal">
+            <span class="sec-idx">§03</span>
+            <h2 class="sec-title">Why Uniform Fails</h2>
+        </div>
+
+        <div class="eq reveal">
+            $$|\Delta(\mu,\pi)| \le \sum_{t \lt T}\lambda_t\, u_t, \qquad \lambda_t = 4\xi\,\bar{\ell}\,(T-t)$$
+        </div>
+
+        <div class="callout reveal">
+            <div class="mark">!</div>
+            <div>
+                <h4>The asymmetry</h4>
+                <p>The multiplier $\lambda_t \propto (T-t)$ grows with the <strong>remaining horizon</strong>: an early-token deviation reshapes every later token's conditioning, so its error compounds over the whole suffix. A flat $D_t \le \delta$ ignores this — under-penalizing early deviations and over-restricting late exploration.</p>
+            </div>
+        </div>
+
+        <div class="versus reveal">
+            <div class="vcard old">
+                <h4>Uniform Threshold</h4>
+                <ul>
+                    <li>Same $\delta$ at every position</li>
+                    <li>Loose on early, high-impact tokens</li>
+                    <li>No memory of accumulated drift</li>
+                </ul>
+            </div>
+            <div class="vcard new">
+                <h4>CPPO (Ours)</h4>
+                <ul>
+                    <li>$w_t$ tightens early tokens</li>
+                    <li>Relaxes shorter-horizon late tokens</li>
+                    <li>$\delta_b$ caps cumulative prefix drift</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ==================== METHOD (formulas) ==================== -->
+<section id="method" class="section tinted">
+    <div class="wrap">
+        <div class="sec-head reveal">
+            <span class="sec-idx">§04</span>
+            <h2 class="sec-title">Method</h2>
+            <span class="sec-aside">CPPO</span>
+        </div>
+
+        <div class="entries reveal">
+            <article class="entry">
+                <div class="entry-num">01</div>
+                <div class="entry-body">
+                    <h3>Position-Weighted Threshold</h3>
+                    <p>A decreasing linear schedule yields a position-dependent threshold $D_t \le \delta/w_t$ — strict early, relaxed late:</p>
+                    <div class="eq small">
+                        $$w_t = 1 - \frac{1-w_{\min}}{T-1}(t-1),\qquad w_t \in [w_{\min}, 1]$$
+                    </div>
+                </div>
+            </article>
+            <article class="entry">
+                <div class="entry-num">02</div>
+                <div class="entry-body">
+                    <h3>Cumulative Prefix Budget</h3>
+                    <p>An effective threshold caps the weighted prefix average, tightening as drift accumulates:</p>
+                    <div class="eq small">
+                        $$w_t D_t \le c_t^{\text{CPPO}} := \min\{\delta,\; \delta + \delta_b W_{t-1} - S_{t-1}\}$$
+                    </div>
+                </div>
+            </article>
+            <article class="entry">
+                <div class="entry-num">03</div>
+                <div class="entry-body">
+                    <h3>Token Mask &amp; Surrogate</h3>
+                    <p>The two constraints fold into one feasibility test $I_t$; corrective updates are never blocked, and the mask plugs straight into the PPO/GRPO ratio–advantage objective:</p>
+                    <div class="eq small">
+                        $$M_t^{\text{CPPO}} = \mathbb{1}\!\left(\hat{A}_t(\rho_t-1)\le 0 \;\vee\; I_t\right),\quad I_t : w_t D_t \le \delta \;\wedge\; S_t \le \delta + \delta_b W_{t-1}$$
+                    </div>
+                    <div class="eq small">
+                        $$\mathcal{L}^{\text{CPPO}}_{\mu}(\pi) = \mathbb{E}_{\mu}\!\left[\sum_{t=1}^{T} M_t^{\text{CPPO}}\,\rho_t\,\hat{A}_t\right]$$
+                    </div>
+                    <p class="detail">Reuses the same per-token divergence as DPPO — <strong>no extra loss terms, no new estimator</strong>.</p>
+                </div>
+            </article>
+        </div>
+
+        <figure class="plate result-fig reveal" style="margin-top:2.6rem;">
+            <img src="assets/figs/fig3_prefix_constraint.png" alt="Cumulative prefix constraint on a token window.">
+            <figcaption class="figcap">
+                <span class="lab">Figure 5 —</span> The prefix constraint on a token window. <b>Blue:</b> token-level threshold $\delta$ active. <b>Orange:</b> accumulated drift pushes the prefix average up, so the effective threshold drops below $\delta$ — the orange bar passes the token test yet is masked by the prefix budget.
+            </figcaption>
+        </figure>
+
+        <figure class="plate result-fig reveal" style="margin-top:2rem;">
+            <img src="assets/figs/fig2_position_deviation.png" alt="Position-conditioned policy deviation and the induced threshold.">
+            <figcaption class="figcap">
+                <span class="lab">Figure 6 —</span> Policy deviation $|\pi_\theta-\mu|$ from Qwen3-30B-A3B rollouts grows with token position (left, middle); the induced threshold $\delta/w_t$ is tighter early and relaxed late (right).
+            </figcaption>
+        </figure>
+    </div>
+</section>
+
+<!-- ==================== TAKEAWAYS ==================== -->
+<section id="takeaways" class="section">
+    <div class="wrap">
+        <div class="sec-head reveal">
+            <span class="sec-idx">§05</span>
+            <h2 class="sec-title">Takeaways</h2>
+        </div>
+        <div class="stats reveal">
+            <div class="stat">
+                <div class="n">4&#8260;4</div>
+                <h3>Best Everywhere</h3>
+                <p>Top score on all four Qwen3 models — dense &amp; MoE, Base &amp; post-trained.</p>
+            </div>
+            <div class="stat">
+                <div class="n">+5.56</div>
+                <h3>Long Horizon</h3>
+                <p>Biggest margin on 30B-A3B-Base (16k), where early-token propagation dominates.</p>
+            </div>
+            <div class="stat">
+                <div class="n">Stable</div>
+                <h3>No Collapse</h3>
+                <p>Trains stably where CISPO collapses and TRM-Max falls to 20.27.</p>
+            </div>
+            <div class="stat">
+                <div class="n">Drop-in</div>
+                <h3>No New Loss</h3>
+                <p>A token mask on PPO/GRPO with DPPO's divergence — provably tighter bound.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer class="colophon">
+    <div class="wrap">
+        <p>CPPO &nbsp;·&nbsp; <span class="accent">Tencent Hunyuan</span> &nbsp;·&nbsp; 2026<br>Set in Fraunces, Spectral &amp; IBM Plex Mono.</p>
+    </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>
