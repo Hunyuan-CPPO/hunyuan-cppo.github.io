@@ -11,9 +11,10 @@
 我们为论文 **CPPO**（*Beyond Uniform Token-Level Trust Region in LLM Reinforcement Learning*，Tencent Hunyuan）做了一个 **GitHub Pages 学术项目主页**，风格参考 Flow-DPPO 的 project page，但**重新设计**成"腾讯混元蓝 + 排版学术风"，并支持 **中英双语**。
 
 - **论文 PDF 源**：仓库根目录 `cppo.pdf`（即 `/apdcephfs_cq8/share_1611098/sumailmao/hunyuan_projects/Angel-RL/cppo.pdf`）
-- **线上地址（Live URL）**：https://chongqichuizi875.github.io/CPPO-Project-Page/
-- **GitHub 仓库**：https://github.com/chongqichuizi875/CPPO-Project-Page
-- **GitHub 账号**：`chongqichuizi875`
+- **线上地址（Live URL）**：https://hunyuan-cppo.github.io/
+- **GitHub 仓库**：https://github.com/Hunyuan-CPPO/hunyuan-cppo.github.io
+- **GitHub 组织 / Org**：`Hunyuan-CPPO`（这是 user/org pages 仓库 `hunyuan-cppo.github.io`，所以站点在**根路径**，不再是 `/CPPO-Project-Page/` 子路径）
+- **推送用的 GitHub 账号**：`chongqichuizi875`（本机 SSH key 对应这个账号，它是 `Hunyuan-CPPO` 组织成员，所以 push 照常生效）
 
 ---
 
@@ -133,9 +134,9 @@ python3 -m http.server 8080
 ## 6. 怎么 push 到远程 / How to push
 
 > ✅ **本机已配置好 SSH（一次性），现在 push 不再需要任何 token。**
-> 这台机器的 SSH 公钥已加到 GitHub 账号 `chongqichuizi875`，
+> 这台机器的 SSH 公钥已加到 GitHub 账号 `chongqichuizi875`（它是 `Hunyuan-CPPO` 组织成员），
 > 且因为本环境端口 22 被墙，已在 `~/.ssh/config` 把 `github.com` 走 `ssh.github.com:443`。
-> remote 也已切成 SSH（`git@github.com:…`）。所以下面三行就够了。
+> remote 已指向新仓库的 SSH 地址（`git@github.com:Hunyuan-CPPO/hunyuan-cppo.github.io.git`）。所以下面三行就够了。
 
 ### 6.1 提交并推送（日常就用这个）
 
@@ -153,7 +154,7 @@ git push origin main
 ### 6.2 确认上线
 - GitHub Pages 会在 ~30–60 秒内自动重建。
 - 打开（最好用无痕窗口 / 强制刷新 Cmd+Shift+R）：
-  **https://chongqichuizi875.github.io/CPPO-Project-Page/**
+  **https://hunyuan-cppo.github.io/**
 - 想确认远端已收到：`git status -sb`（应显示 `## main...origin/main`，没有 `ahead`）。
 
 ### 6.3 如果 push 报错怎么办 / Troubleshooting push
@@ -162,7 +163,7 @@ git push origin main
 |---|---|
 | `Permission denied (publickey)` | GitHub 不认这台机器的 key。重新把 `~/.ssh/id_rsa.pub` 加到 GitHub → Settings → SSH and GPG keys。 |
 | `Connection timed out` / 卡住 | 端口 22 被墙。确认 `~/.ssh/config` 里 `github.com` 的 `HostName ssh.github.com` + `Port 443`（见下方"环境备注"）。 |
-| `could not read Username for https://github.com` | remote 还是 HTTPS。执行 `git remote set-url origin git@github.com:chongqichuizi875/CPPO-Project-Page.git` 改回 SSH。 |
+| `could not read Username for https://github.com` | remote 还是 HTTPS。执行 `git remote set-url origin git@github.com:Hunyuan-CPPO/hunyuan-cppo.github.io.git` 改回 SSH。 |
 
 **环境备注**：本机 `~/.ssh/config` 里应有这段（已配好，仅供排查时核对）：
 ```
@@ -212,11 +213,11 @@ AI 应当：
 | Pages 没更新 | 等 1 分钟；或去仓库 **Actions / Settings → Pages** 看构建状态。 |
 | push 报 `Permission denied (publickey)` | GitHub 不认本机 key。把 `~/.ssh/id_rsa.pub` 重新加到 GitHub → Settings → SSH and GPG keys。 |
 | push `Connection timed out` / 卡住 | 端口 22 被墙。核对 `~/.ssh/config` 里 `github.com` → `HostName ssh.github.com` + `Port 443`（见第 6.3 节）。 |
-| push 报 `could not read Username for https://github.com` | remote 退回了 HTTPS。执行 `git remote set-url origin git@github.com:chongqichuizi875/CPPO-Project-Page.git`。 |
+| push 报 `could not read Username for https://github.com` | remote 退回了 HTTPS。执行 `git remote set-url origin git@github.com:Hunyuan-CPPO/hunyuan-cppo.github.io.git`。 |
 | 切换语言页面抖动 | 别在 masthead 纯英文元素上挂随语言变化的样式（见第 3 节第 6 条）。 |
 | 公式显示成乱码/被截断 | 数学里别用裸 `<`/`>`，用 `\lt`/`\gt`；`$…$` 行内、`$$…$$` 独行。 |
 | `.en`/`.zh` 数量不一致 | 漏写了一种语言的 span；检查成对。 |
 
 ---
 
-_最后更新：2026-06-10 · 维护者：sumailmao · 账号：chongqichuizi875_
+_最后更新：2026-06-11 · 维护者：sumailmao · 推送账号：chongqichuizi875 · 仓库：Hunyuan-CPPO/hunyuan-cppo.github.io_
