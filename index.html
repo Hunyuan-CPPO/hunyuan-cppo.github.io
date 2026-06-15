@@ -3,18 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- language: persisted choice, else China locale/timezone -> zh, otherwise en -->
+    <!-- language: persisted choice, else default to en -->
     <script>
     (function(){
         try {
-            var saved = localStorage.getItem('cppo-lang');
-            var lang = saved;
-            if (!lang) {
-                var tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || '').toLowerCase();
-                var cn = ['asia/shanghai','asia/chongqing','asia/urumqi','asia/harbin','asia/macau','asia/hong_kong'];
-                var nav = (navigator.language || '').toLowerCase();
-                lang = (cn.indexOf(tz) >= 0 || nav.indexOf('zh-cn') === 0 || nav === 'zh') ? 'zh' : 'en';
-            }
+            var lang = localStorage.getItem('cppo-lang') || 'en';
             document.documentElement.setAttribute('data-lang', lang);
         } catch (e) { document.documentElement.setAttribute('data-lang', 'en'); }
     })();
