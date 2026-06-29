@@ -67,6 +67,7 @@ html[data-lang="zh"] .stat p { line-height: 1.85; }
     --ink-mute:     #79839a;
     --accent:       #0a54d6;
     --accent-deep:  #0540ac;
+    --accent-light: rgba(10, 84, 214, 0.15);
     --accent-tint:  rgba(10, 84, 214, 0.09);
     --pine:         #2c5d52;
     --line:         rgba(20, 30, 55, 0.16);
@@ -301,6 +302,8 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .act:hover { text-decoration: none; transform: translateY(-2px); }
 .act.primary { background: var(--ink); color: var(--paper); }
 .act.primary:hover { background: var(--accent); border-color: var(--accent); box-shadow: 0 10px 22px -12px var(--accent-deep); }
+.act.secondary { background: var(--paper); color: var(--ink); border-color: var(--accent); }
+.act.secondary:hover { background: var(--accent-light); border-color: var(--accent); box-shadow: 0 10px 22px -12px rgba(200, 60, 60, 0.2); }
 .act.ghost:hover { background: var(--ink); color: var(--paper); }
 .act.dim {
     border-color: var(--line);
@@ -309,6 +312,16 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 }
 .act.dim:hover { transform: none; }
 .act .soon { font-size: 0.66em; opacity: 0.75; }
+.act .pr-pending {
+    font-size: 0.66em;
+    opacity: 0.75;
+    background: linear-gradient(45deg, #ff6b6b, #ffa500);
+    color: white;
+    padding: 0.1em 0.4em;
+    border-radius: 3px;
+    margin-left: 0.3em;
+    font-weight: 600;
+}
 .act .ico { flex-shrink: 0; display: block; }
 .act.primary .ico path { fill: var(--paper); }
 .act.primary .ico text { fill: var(--ink); }
